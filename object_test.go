@@ -118,6 +118,23 @@ func TestArgumentedSiganl(t *testing.T) {
 	}
 }
 
+func TestReturnValue(t *testing.T) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+
+	var ret int
+	obj.Call(func() {
+		ret = obj.i
+	}).Wait()
+	if ret != obj.i {
+		t.Fail()
+	}
+}
+
 func BenchmarkCall(b *testing.B) {
 	obj := &testObject{
 		Object: New(),
