@@ -98,6 +98,26 @@ func TestNto1Signal(t *testing.T) {
 	}
 }
 
+func TestArgumentedSiganl(t *testing.T) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+
+	obj.Connect("signal", func(i int) {
+		obj.i += i
+	})
+	n := 10000
+	for i := 0; i < n; i++ {
+		obj.Emit("signal", 1).Wait()
+	}
+	if obj.i != n {
+		t.Fail()
+	}
+}
+
 func BenchmarkCall(b *testing.B) {
 	obj := &testObject{
 		Object: New(),
@@ -124,5 +144,27 @@ func BenchmarkEmit(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		obj.Emit("signal").Wait()
+	}
+}
+
+func BenchmarkArgumentedEmit(b *testing.B) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+	obj.Connect("signal", func(b bool) {})
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		obj.Emit("signal", true).Wait()
+	}
+}
+
+func BenchmarkBaseline(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		func() {
+		}()
 	}
 }
