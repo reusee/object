@@ -19,6 +19,12 @@ const (
 	_Emit
 )
 
+var condPool = sync.Pool{
+	New: func() interface{} {
+		return sync.NewCond(new(sync.Mutex))
+	},
+}
+
 type Call struct {
 	what     int
 	signal   string
@@ -26,6 +32,7 @@ type Call struct {
 	doneCond *sync.Cond
 	done     bool
 	args     []interface{}
+	ret      interface{}
 }
 
 func New() *Object {
@@ -37,7 +44,12 @@ func New() *Object {
 		for call := range obj.calls {
 			switch call.what {
 			case _Call:
-				call.fun.(func())()
+				if reflect.TypeOf(call.fun).NumOut() > 0 {
+					retValues := reflect.ValueOf(call.fun).Call(nil)
+					call.ret = retValues[0].Interface()
+				} else {
+					call.fun.(func())()
+				}
 			case _Connect:
 				obj.signals[call.signal] = append(obj.signals[call.signal], call.fun)
 			case _Emit:
@@ -59,6 +71,7 @@ func New() *Object {
 			call.done = true
 			call.doneCond.L.Unlock()
 			call.doneCond.Broadcast()
+			condPool.Put(call.doneCond)
 			if call.what == _Die {
 				break
 			}
@@ -67,11 +80,11 @@ func New() *Object {
 	return obj
 }
 
-func (obj *Object) Call(fun func()) *Call {
+func (obj *Object) Call(fun interface{}) *Call {
 	call := &Call{
 		what:     _Call,
 		fun:      fun,
-		doneCond: sync.NewCond(new(sync.Mutex)),
+		doneCond: condPool.Get().(*sync.Cond),
 	}
 	obj.calls <- call
 	return call
@@ -80,7 +93,7 @@ func (obj *Object) Call(fun func()) *Call {
 func (obj *Object) Die() *Call {
 	call := &Call{
 		what:     _Die,
-		doneCond: sync.NewCond(new(sync.Mutex)),
+		doneCond: condPool.Get().(*sync.Cond),
 	}
 	obj.calls <- call
 	return call
@@ -91,7 +104,7 @@ func (obj *Object) Connect(signal string, fun interface{}) *Call {
 		what:     _Connect,
 		signal:   signal,
 		fun:      fun,
-		doneCond: sync.NewCond(new(sync.Mutex)),
+		doneCond: condPool.Get().(*sync.Cond),
 	}
 	obj.calls <- call
 	return call
@@ -101,7 +114,7 @@ func (obj *Object) Emit(signal string, args ...interface{}) *Call {
 	call := &Call{
 		what:     _Emit,
 		signal:   signal,
-		doneCond: sync.NewCond(new(sync.Mutex)),
+		doneCond: condPool.Get().(*sync.Cond),
 		args:     args,
 	}
 	obj.calls <- call
@@ -114,4 +127,9 @@ func (call *Call) Wait() {
 		call.doneCond.Wait()
 	}
 	call.doneCond.L.Unlock()
+}
+
+func (call *Call) Get() interface{} {
+	call.Wait()
+	return call.ret
 }

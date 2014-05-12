@@ -36,6 +36,22 @@ func TestCall(t *testing.T) {
 	}
 }
 
+func TestCallGet(t *testing.T) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+
+	call := obj.Call(func() int {
+		return obj.i
+	})
+	if call.Get().(int) != obj.i {
+		t.Fail()
+	}
+}
+
 func Test1to1Signal(t *testing.T) {
 	obj := &testObject{
 		Object: New(),
