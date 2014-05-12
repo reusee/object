@@ -44,7 +44,7 @@ func TestCallGet(t *testing.T) {
 		obj.Die().Wait()
 	}()
 
-	call := obj.Call(func() int {
+	call := obj.Call(func() interface{} {
 		return obj.i
 	})
 	if call.Get().(int) != obj.i {
@@ -122,8 +122,8 @@ func TestArgumentedSiganl(t *testing.T) {
 		obj.Die().Wait()
 	}()
 
-	obj.Connect("signal", func(i int) {
-		obj.i += i
+	obj.Connect("signal", func(i interface{}) {
+		obj.i += i.(int)
 	})
 	n := 10000
 	for i := 0; i < n; i++ {
@@ -187,7 +187,7 @@ func BenchmarkArgumentedEmit(b *testing.B) {
 	defer func() {
 		obj.Die().Wait()
 	}()
-	obj.Connect("signal", func(b bool) {})
+	obj.Connect("signal", func(b interface{}) {})
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

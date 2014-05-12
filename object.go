@@ -3,7 +3,6 @@ package object
 //TODO receive channels
 
 import (
-	"reflect"
 	"sync"
 )
 
@@ -31,7 +30,7 @@ type Call struct {
 	fun      interface{}
 	doneCond *sync.Cond
 	done     bool
-	args     []interface{}
+	arg      []interface{}
 	ret      interface{}
 }
 
@@ -44,22 +43,20 @@ func New() *Object {
 		for call := range obj.calls {
 			switch call.what {
 			case _Call:
-				if reflect.TypeOf(call.fun).NumOut() > 0 {
-					retValues := reflect.ValueOf(call.fun).Call(nil)
-					call.ret = retValues[0].Interface()
-				} else {
-					call.fun.(func())()
+				switch f := call.fun.(type) {
+				case func() interface{}:
+					call.ret = f()
+				case func():
+					f()
+				default:
+					panic("wrong closure type")
 				}
 			case _Connect:
 				obj.signals[call.signal] = append(obj.signals[call.signal], call.fun)
 			case _Emit:
-				if len(call.args) > 0 {
-					var argValues []reflect.Value
-					for _, arg := range call.args {
-						argValues = append(argValues, reflect.ValueOf(arg))
-					}
+				if len(call.arg) > 0 {
 					for _, fun := range obj.signals[call.signal] {
-						reflect.ValueOf(fun).Call(argValues)
+						fun.(func(interface{}))(call.arg[0])
 					}
 				} else {
 					for _, fun := range obj.signals[call.signal] {
@@ -110,12 +107,12 @@ func (obj *Object) Connect(signal string, fun interface{}) *Call {
 	return call
 }
 
-func (obj *Object) Emit(signal string, args ...interface{}) *Call {
+func (obj *Object) Emit(signal string, arg ...interface{}) *Call {
 	call := &Call{
 		what:     _Emit,
 		signal:   signal,
 		doneCond: condPool.Get().(*sync.Cond),
-		args:     args,
+		arg:      arg,
 	}
 	obj.calls <- call
 	return call
