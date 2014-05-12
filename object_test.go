@@ -62,8 +62,9 @@ func Test1to1Signal(t *testing.T) {
 
 	n := 10000
 	for i := 0; i < n; i++ {
-		obj.Connect(fmt.Sprintf("sig-%d", i), func() {
+		obj.Connect(fmt.Sprintf("sig-%d", i), func() bool {
 			obj.i++
+			return true
 		})
 	}
 	for i := 0; i < n; i++ {
@@ -84,8 +85,9 @@ func Test1toNSignal(t *testing.T) {
 
 	n := 10000
 	for i := 0; i < n; i++ {
-		obj.Connect("signal", func() {
+		obj.Connect("signal", func() bool {
 			obj.i++
+			return true
 		})
 	}
 	obj.Emit("signal").Wait()
@@ -102,8 +104,9 @@ func TestNto1Signal(t *testing.T) {
 		obj.Die().Wait()
 	}()
 
-	obj.Connect("signal", func() {
+	obj.Connect("signal", func() bool {
 		obj.i++
+		return true
 	})
 	n := 10000
 	for i := 0; i < n; i++ {
@@ -122,14 +125,34 @@ func TestArgumentedSiganl(t *testing.T) {
 		obj.Die().Wait()
 	}()
 
-	obj.Connect("signal", func(i interface{}) {
+	obj.Connect("signal", func(i interface{}) bool {
 		obj.i += i.(int)
+		return true
 	})
 	n := 10000
 	for i := 0; i < n; i++ {
 		obj.Emit("signal", 1).Wait()
 	}
 	if obj.i != n {
+		t.Fail()
+	}
+}
+
+func TestOneshotSignal(t *testing.T) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+
+	obj.Connect("signal", func(i interface{}) bool {
+		obj.i += i.(int)
+		return false
+	})
+	obj.Emit("signal", 8).Wait()
+	obj.Emit("signal", 10).Wait()
+	if obj.i != 8 {
 		t.Fail()
 	}
 }
@@ -172,7 +195,9 @@ func BenchmarkEmit(b *testing.B) {
 	defer func() {
 		obj.Die().Wait()
 	}()
-	obj.Connect("signal", func() {})
+	obj.Connect("signal", func() bool {
+		return true
+	})
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -187,7 +212,9 @@ func BenchmarkArgumentedEmit(b *testing.B) {
 	defer func() {
 		obj.Die().Wait()
 	}()
-	obj.Connect("signal", func(b interface{}) {})
+	obj.Connect("signal", func(b interface{}) bool {
+		return true
+	})
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
