@@ -188,6 +188,20 @@ func BenchmarkCall(b *testing.B) {
 	}
 }
 
+func BenchmarkCallNoWait(b *testing.B) {
+	obj := &testObject{
+		Object: New(),
+	}
+	defer func() {
+		obj.Die().Wait()
+	}()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		obj.Call(func() {})
+	}
+}
+
 func BenchmarkEmit(b *testing.B) {
 	obj := &testObject{
 		Object: New(),
