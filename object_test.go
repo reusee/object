@@ -16,6 +16,8 @@ type testObject struct {
 
 var testN2One = NewN2OneDriver(32)
 
+var testN2M = NewN2MDriver(32)
+
 // tests
 
 func TestDefaultCall(t *testing.T) {
@@ -24,6 +26,10 @@ func TestDefaultCall(t *testing.T) {
 
 func TestN2OneCall(t *testing.T) {
 	testCall(t, testN2One.New())
+}
+
+func TestN2MCall(t *testing.T) {
+	testCall(t, testN2M.New())
 }
 
 func testCall(t *testing.T, o *Object) {
@@ -58,6 +64,10 @@ func TestN2OneCallGet(t *testing.T) {
 	testCallGet(t, testN2One.New())
 }
 
+func TestN2MCallGet(t *testing.T) {
+	testCallGet(t, testN2M.New())
+}
+
 func testCallGet(t *testing.T, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -78,7 +88,11 @@ func TestDefault1to1Signal(t *testing.T) {
 }
 
 func TestN2One1to1Signal(t *testing.T) {
-	test1to1Signal(t, New())
+	test1to1Signal(t, testN2One.New())
+}
+
+func TestN2M1to1Signal(t *testing.T) {
+	test1to1Signal(t, testN2M.New())
 }
 
 func test1to1Signal(t *testing.T, o *Object) {
@@ -98,6 +112,7 @@ func test1to1Signal(t *testing.T, o *Object) {
 	for i := 0; i < n; i++ {
 		obj.Emit(fmt.Sprintf("sig-%d", i)).Wait()
 	}
+	t.Logf("%d\n", obj.i)
 	if obj.i != n {
 		t.Fail()
 	}
@@ -109,6 +124,10 @@ func TestDefault1toNSignal(t *testing.T) {
 
 func TestN2One1toNSignal(t *testing.T) {
 	test1toNSignal(t, testN2One.New())
+}
+
+func TestN2M1toNSignal(t *testing.T) {
+	test1toNSignal(t, testN2M.New())
 }
 
 func test1toNSignal(t *testing.T, o *Object) {
@@ -139,6 +158,10 @@ func TestN2OneNto1Signal(t *testing.T) {
 	testNto1Signal(t, testN2One.New())
 }
 
+func TestN2MNto1Signal(t *testing.T) {
+	testNto1Signal(t, testN2M.New())
+}
+
 func testNto1Signal(t *testing.T, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -165,6 +188,10 @@ func TestDefaultArgumentedSignal(t *testing.T) {
 
 func TestN2OneArgumentedSignal(t *testing.T) {
 	testArgumentedSignal(t, testN2One.New())
+}
+
+func TestN2MArgumentedSignal(t *testing.T) {
+	testArgumentedSignal(t, testN2M.New())
 }
 
 func testArgumentedSignal(t *testing.T, o *Object) {
@@ -195,6 +222,10 @@ func TestN2OneOneshotSignal(t *testing.T) {
 	testOneshotSignal(t, testN2One.New())
 }
 
+func TestN2MOneshotSignal(t *testing.T) {
+	testOneshotSignal(t, testN2M.New())
+}
+
 func testOneshotSignal(t *testing.T, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -219,6 +250,10 @@ func TestDefaultReturnValue(t *testing.T) {
 
 func TestN2OneReturnValue(t *testing.T) {
 	testReturnValue(t, testN2One.New())
+}
+
+func TestN2MReturnValue(t *testing.T) {
+	testReturnValue(t, testN2M.New())
 }
 
 func testReturnValue(t *testing.T, o *Object) {
@@ -247,6 +282,10 @@ func BenchmarkN2OneCall(b *testing.B) {
 	benchCall(b, testN2One.New())
 }
 
+func BenchmarkN2MCall(b *testing.B) {
+	benchCall(b, testN2M.New())
+}
+
 func benchCall(b *testing.B, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -268,6 +307,10 @@ func BenchmarkN2OneCallNoWait(b *testing.B) {
 	benchCallNoWait(b, testN2One.New())
 }
 
+func BenchmarkN2MCallNoWait(b *testing.B) {
+	benchCallNoWait(b, testN2M.New())
+}
+
 func benchCallNoWait(b *testing.B, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -287,6 +330,10 @@ func BenchmarkDefaultEmit(b *testing.B) {
 
 func BenchmarkN2OneEmit(b *testing.B) {
 	benchEmit(b, testN2One.New())
+}
+
+func BenchmarkN2MEmit(b *testing.B) {
+	benchEmit(b, testN2M.New())
 }
 
 func benchEmit(b *testing.B, o *Object) {
@@ -313,6 +360,10 @@ func BenchmarkN2OneArgumentedEmit(b *testing.B) {
 	benchArgumentedEmit(b, testN2One.New())
 }
 
+func BenchmarkN2MArgumentedEmit(b *testing.B) {
+	benchArgumentedEmit(b, testN2M.New())
+}
+
 func benchArgumentedEmit(b *testing.B, o *Object) {
 	obj := &testObject{
 		Object: o,
@@ -335,6 +386,10 @@ func BenchmarkDefaultLongtimeCall(b *testing.B) {
 
 func BenchmarkN2OneLongtimeCall(b *testing.B) {
 	benchLongtimeCall(b, testN2One.New)
+}
+
+func BenchmarkN2MLongtimeCall(b *testing.B) {
+	benchLongtimeCall(b, testN2M.New)
 }
 
 func benchLongtimeCall(b *testing.B, ctor func() *Object) {

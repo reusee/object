@@ -1,5 +1,7 @@
 package object
 
+import "sync"
+
 type Driver interface {
 	New() *Object
 }
@@ -32,7 +34,7 @@ func (d *One2OneDriver) New() *Object {
 type N2OneDriver struct {
 	*Object // thread-safe is needed
 	N       int
-	Workers []*Worker
+	workers []*_Worker
 }
 
 func NewN2OneDriver(n int) *N2OneDriver {
@@ -45,8 +47,8 @@ func NewN2OneDriver(n int) *N2OneDriver {
 func (d *N2OneDriver) New() (obj *Object) {
 	d.Call(func() {
 		// select a worker
-		var worker *Worker
-		for _, w := range d.Workers {
+		var worker *_Worker
+		for _, w := range d.workers {
 			w.Call(func() {
 				if w.nObjects < d.N {
 					worker = w
@@ -59,8 +61,8 @@ func (d *N2OneDriver) New() (obj *Object) {
 		}
 		// none selected, create one
 		if worker == nil {
-			worker = NewWorker()
-			d.Workers = append(d.Workers, worker)
+			worker = newWorker()
+			d.workers = append(d.workers, worker)
 			worker.Call(func() {
 				worker.nObjects++
 			})
@@ -76,14 +78,14 @@ func (d *N2OneDriver) New() (obj *Object) {
 	return obj
 }
 
-type Worker struct {
+type _Worker struct {
 	*Object
 	nObjects int
 	calls    chan *Call
 }
 
-func NewWorker() *Worker {
-	w := &Worker{
+func newWorker() *_Worker {
+	w := &_Worker{
 		Object: New(),
 		calls:  make(chan *Call),
 	}
@@ -97,4 +99,67 @@ func NewWorker() *Worker {
 		}
 	}()
 	return w
+}
+
+// n:m driver
+
+type N2MDriver struct {
+	runnables chan *_Runnable
+}
+
+func NewN2MDriver(n int) *N2MDriver {
+	d := &N2MDriver{
+		runnables: make(chan *_Runnable, 128),
+	}
+	for i := 0; i < n; i++ {
+		go func() {
+			for runnable := range d.runnables {
+				for {
+					runnable.lock.Lock()
+					if len(runnable.calls) == 0 {
+						runnable.state = _StateSleep
+						runnable.lock.Unlock()
+						break
+					}
+					runnable.object.processCall(runnable.calls[0])
+					runnable.calls = runnable.calls[1:]
+					runnable.lock.Unlock()
+				}
+			}
+		}()
+	}
+	return d
+}
+
+type _Runnable struct {
+	state  int
+	lock   *sync.Mutex
+	calls  []*Call
+	object *Object
+}
+
+const (
+	_StateSleep = iota
+	_StateReady
+)
+
+func (d *N2MDriver) New() *Object {
+	runnable := &_Runnable{
+		state: _StateSleep,
+		lock:  new(sync.Mutex),
+	}
+	obj := &Object{
+		call: func(call *Call) {
+			runnable.lock.Lock()
+			runnable.calls = append(runnable.calls, call)
+			if runnable.state == _StateSleep {
+				runnable.state = _StateReady
+				d.runnables <- runnable
+			}
+			runnable.lock.Unlock()
+		},
+		signals: make(map[string][]interface{}),
+	}
+	runnable.object = obj
+	return obj
 }
