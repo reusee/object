@@ -31,7 +31,7 @@ type Call struct {
 	ret      interface{}
 }
 
-var New = new(PerObjectPerGoroutine).New
+var New = new(One2OneDriver).New
 
 func (obj *Object) processCall(call *Call) (exit bool) {
 	switch call.what {

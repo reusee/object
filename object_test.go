@@ -14,24 +14,16 @@ type testObject struct {
 	i int
 }
 
-func testNewDefaultObject() *Object {
-	return New()
-}
-
-var testOG4NDriver = NewOneGoroutineForNObjects(32)
-
-func testNewOG4NObject() *Object {
-	return testOG4NDriver.New()
-}
+var testN2One = NewN2OneDriver(32)
 
 // tests
 
 func TestDefaultCall(t *testing.T) {
-	testCall(t, testNewDefaultObject())
+	testCall(t, New())
 }
 
-func TestOG4NCall(t *testing.T) {
-	testCall(t, testNewOG4NObject())
+func TestN2OneCall(t *testing.T) {
+	testCall(t, testN2One.New())
 }
 
 func testCall(t *testing.T, o *Object) {
@@ -59,11 +51,11 @@ func testCall(t *testing.T, o *Object) {
 }
 
 func TestDefaultCallGet(t *testing.T) {
-	testCallGet(t, testNewDefaultObject())
+	testCallGet(t, New())
 }
 
-func TestOG4NCallGet(t *testing.T) {
-	testCallGet(t, testNewOG4NObject())
+func TestN2OneCallGet(t *testing.T) {
+	testCallGet(t, testN2One.New())
 }
 
 func testCallGet(t *testing.T, o *Object) {
@@ -82,11 +74,11 @@ func testCallGet(t *testing.T, o *Object) {
 }
 
 func TestDefault1to1Signal(t *testing.T) {
-	test1to1Signal(t, testNewDefaultObject())
+	test1to1Signal(t, New())
 }
 
-func TestOG4N1to1Signal(t *testing.T) {
-	test1to1Signal(t, testNewDefaultObject())
+func TestN2One1to1Signal(t *testing.T) {
+	test1to1Signal(t, New())
 }
 
 func test1to1Signal(t *testing.T, o *Object) {
@@ -112,11 +104,11 @@ func test1to1Signal(t *testing.T, o *Object) {
 }
 
 func TestDefault1toNSignal(t *testing.T) {
-	test1toNSignal(t, testNewDefaultObject())
+	test1toNSignal(t, New())
 }
 
-func TestOG4N1toNSignal(t *testing.T) {
-	test1toNSignal(t, testNewOG4NObject())
+func TestN2One1toNSignal(t *testing.T) {
+	test1toNSignal(t, testN2One.New())
 }
 
 func test1toNSignal(t *testing.T, o *Object) {
@@ -140,11 +132,11 @@ func test1toNSignal(t *testing.T, o *Object) {
 }
 
 func TestDefaultNto1Signal(t *testing.T) {
-	testNto1Signal(t, testNewDefaultObject())
+	testNto1Signal(t, New())
 }
 
-func TestOG4NNto1Signal(t *testing.T) {
-	testNto1Signal(t, testNewOG4NObject())
+func TestN2OneNto1Signal(t *testing.T) {
+	testNto1Signal(t, testN2One.New())
 }
 
 func testNto1Signal(t *testing.T, o *Object) {
@@ -168,11 +160,11 @@ func testNto1Signal(t *testing.T, o *Object) {
 }
 
 func TestDefaultArgumentedSignal(t *testing.T) {
-	testArgumentedSignal(t, testNewDefaultObject())
+	testArgumentedSignal(t, New())
 }
 
-func TestOG4NArgumentedSignal(t *testing.T) {
-	testArgumentedSignal(t, testNewOG4NObject())
+func TestN2OneArgumentedSignal(t *testing.T) {
+	testArgumentedSignal(t, testN2One.New())
 }
 
 func testArgumentedSignal(t *testing.T, o *Object) {
@@ -196,11 +188,11 @@ func testArgumentedSignal(t *testing.T, o *Object) {
 }
 
 func TestDefaultOneshotSignal(t *testing.T) {
-	testOneshotSignal(t, testNewDefaultObject())
+	testOneshotSignal(t, New())
 }
 
-func TestOG4NOneshotSignal(t *testing.T) {
-	testOneshotSignal(t, testNewOG4NObject())
+func TestN2OneOneshotSignal(t *testing.T) {
+	testOneshotSignal(t, testN2One.New())
 }
 
 func testOneshotSignal(t *testing.T, o *Object) {
@@ -222,11 +214,11 @@ func testOneshotSignal(t *testing.T, o *Object) {
 }
 
 func TestDefaultReturnValue(t *testing.T) {
-	testReturnValue(t, testNewDefaultObject())
+	testReturnValue(t, New())
 }
 
-func TestOG4NReturnValue(t *testing.T) {
-	testReturnValue(t, testNewOG4NObject())
+func TestN2OneReturnValue(t *testing.T) {
+	testReturnValue(t, testN2One.New())
 }
 
 func testReturnValue(t *testing.T, o *Object) {
@@ -248,11 +240,11 @@ func testReturnValue(t *testing.T, o *Object) {
 // benchmarks
 
 func BenchmarkDefaultCall(b *testing.B) {
-	benchCall(b, testNewDefaultObject())
+	benchCall(b, New())
 }
 
-func BenchmarkOG4NCall(b *testing.B) {
-	benchCall(b, testNewOG4NObject())
+func BenchmarkN2OneCall(b *testing.B) {
+	benchCall(b, testN2One.New())
 }
 
 func benchCall(b *testing.B, o *Object) {
@@ -269,11 +261,11 @@ func benchCall(b *testing.B, o *Object) {
 }
 
 func BenchmarkDefaultCallNoWait(b *testing.B) {
-	benchCallNoWait(b, testNewDefaultObject())
+	benchCallNoWait(b, New())
 }
 
-func BenchmarkOG4NCallNoWait(b *testing.B) {
-	benchCallNoWait(b, testNewOG4NObject())
+func BenchmarkN2OneCallNoWait(b *testing.B) {
+	benchCallNoWait(b, testN2One.New())
 }
 
 func benchCallNoWait(b *testing.B, o *Object) {
@@ -290,11 +282,11 @@ func benchCallNoWait(b *testing.B, o *Object) {
 }
 
 func BenchmarkDefaultEmit(b *testing.B) {
-	benchEmit(b, testNewDefaultObject())
+	benchEmit(b, New())
 }
 
-func BenchmarkOG4NEmit(b *testing.B) {
-	benchEmit(b, testNewOG4NObject())
+func BenchmarkN2OneEmit(b *testing.B) {
+	benchEmit(b, testN2One.New())
 }
 
 func benchEmit(b *testing.B, o *Object) {
@@ -314,11 +306,11 @@ func benchEmit(b *testing.B, o *Object) {
 }
 
 func BenchmarkDefaultArgumentedEmit(b *testing.B) {
-	benchArgumentedEmit(b, testNewDefaultObject())
+	benchArgumentedEmit(b, New())
 }
 
-func BenchmarkOG4NArgumentedEmit(b *testing.B) {
-	benchArgumentedEmit(b, testNewOG4NObject())
+func BenchmarkN2OneArgumentedEmit(b *testing.B) {
+	benchArgumentedEmit(b, testN2One.New())
 }
 
 func benchArgumentedEmit(b *testing.B, o *Object) {
@@ -338,11 +330,11 @@ func benchArgumentedEmit(b *testing.B, o *Object) {
 }
 
 func BenchmarkDefaultLongtimeCall(b *testing.B) {
-	benchLongtimeCall(b, testNewDefaultObject)
+	benchLongtimeCall(b, New)
 }
 
-func BenchmarkOG4NLongtimeCall(b *testing.B) {
-	benchLongtimeCall(b, testNewOG4NObject)
+func BenchmarkN2OneLongtimeCall(b *testing.B) {
+	benchLongtimeCall(b, testN2One.New)
 }
 
 func benchLongtimeCall(b *testing.B, ctor func() *Object) {

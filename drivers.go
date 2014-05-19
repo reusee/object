@@ -1,17 +1,15 @@
 package object
 
-//TODO m goroutine for n object driver
-
 type Driver interface {
 	New() *Object
 }
 
 // per object per goroutine
 
-type PerObjectPerGoroutine struct {
+type One2OneDriver struct {
 }
 
-func (d *PerObjectPerGoroutine) New() *Object {
+func (d *One2OneDriver) New() *Object {
 	calls := make(chan *Call, 128)
 	obj := &Object{
 		call: func(call *Call) {
@@ -31,20 +29,20 @@ func (d *PerObjectPerGoroutine) New() *Object {
 
 // one goroutine for n objects
 
-type OneGoroutineForNObjects struct {
+type N2OneDriver struct {
 	*Object // thread-safe is needed
 	N       int
 	Workers []*Worker
 }
 
-func NewOneGoroutineForNObjects(n int) *OneGoroutineForNObjects {
-	return &OneGoroutineForNObjects{
+func NewN2OneDriver(n int) *N2OneDriver {
+	return &N2OneDriver{
 		Object: New(),
 		N:      n,
 	}
 }
 
-func (d *OneGoroutineForNObjects) New() (obj *Object) {
+func (d *N2OneDriver) New() (obj *Object) {
 	d.Call(func() {
 		// select a worker
 		var worker *Worker
