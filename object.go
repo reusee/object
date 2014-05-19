@@ -1,8 +1,6 @@
 package object
 
-import (
-	"sync"
-)
+import "sync"
 
 type Object struct {
 	calls   chan *Call
@@ -23,6 +21,7 @@ var condPool = sync.Pool{
 }
 
 type Call struct {
+	object   *Object
 	what     int
 	signal   string
 	fun      interface{}
@@ -32,20 +31,7 @@ type Call struct {
 	ret      interface{}
 }
 
-func NewWithDriver(driver Driver) *Object {
-	obj := &Object{
-		calls:   make(chan *Call, 128),
-		signals: make(map[string][]interface{}),
-	}
-	driver.Drive(obj)
-	return obj
-}
-
-var defaultDriver = new(PerObjectPerGoroutine)
-
-func New() *Object {
-	return NewWithDriver(defaultDriver)
-}
+var New = new(PerObjectPerGoroutine).New
 
 func (obj *Object) processCall(call *Call) (exit bool) {
 	switch call.what {
@@ -96,6 +82,7 @@ func (obj *Object) processCall(call *Call) (exit bool) {
 
 func (obj *Object) Call(fun interface{}) *Call {
 	call := &Call{
+		object:   obj,
 		what:     _Call,
 		fun:      fun,
 		doneCond: condPool.Get().(*sync.Cond),
@@ -106,6 +93,7 @@ func (obj *Object) Call(fun interface{}) *Call {
 
 func (obj *Object) Die() *Call {
 	call := &Call{
+		object:   obj,
 		what:     _Die,
 		doneCond: condPool.Get().(*sync.Cond),
 	}
@@ -115,6 +103,7 @@ func (obj *Object) Die() *Call {
 
 func (obj *Object) Connect(signal string, fun interface{}) *Call {
 	call := &Call{
+		object:   obj,
 		what:     _Connect,
 		signal:   signal,
 		fun:      fun,
@@ -126,6 +115,7 @@ func (obj *Object) Connect(signal string, fun interface{}) *Call {
 
 func (obj *Object) Emit(signal string, arg ...interface{}) *Call {
 	call := &Call{
+		object:   obj,
 		what:     _Emit,
 		signal:   signal,
 		doneCond: condPool.Get().(*sync.Cond),

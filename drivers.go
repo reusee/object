@@ -1,9 +1,9 @@
 package object
 
-import "reflect"
+//TODO m goroutine for n object driver
 
 type Driver interface {
-	Drive(obj *Object)
+	New() *Object
 }
 
 // per object per goroutine
@@ -11,14 +11,19 @@ type Driver interface {
 type PerObjectPerGoroutine struct {
 }
 
-func (d *PerObjectPerGoroutine) Drive(obj *Object) {
+func (d *PerObjectPerGoroutine) New() *Object {
+	obj := &Object{
+		calls:   make(chan *Call, 128),
+		signals: make(map[string][]interface{}),
+	}
 	go func() {
 		for call := range obj.calls {
-			if obj.processCall(call) {
-				break
+			if obj.processCall(call) { // object is dead
+				return
 			}
 		}
 	}()
+	return obj
 }
 
 // one goroutine for n objects
@@ -36,53 +41,18 @@ func NewOneGoroutineForNObjects(n int) *OneGoroutineForNObjects {
 	}
 }
 
-type Worker struct {
-	Objects   []*Object
-	Cases     []reflect.SelectCase
-	NewObject chan *Object
-}
-
-func NewWorker() *Worker {
-	newObjChan := make(chan *Object)
-	w := &Worker{
-		NewObject: newObjChan,
-		Cases: []reflect.SelectCase{
-			{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(newObjChan)},
-		},
-	}
-	go func() {
-		for {
-			n, recv, ok := reflect.Select(w.Cases)
-			switch {
-			// new object
-			case n == 0:
-				obj := recv.Interface().(*Object)
-				w.Objects = append(w.Objects, obj)
-				w.Cases = append(w.Cases, reflect.SelectCase{
-					Dir: reflect.SelectRecv, Chan: reflect.ValueOf(obj.calls),
-				})
-
-			// object call
-			default:
-				if !ok { // object is dead
-					w.Objects = append(w.Objects[:n-1], w.Objects[n:]...)
-					w.Cases = append(w.Cases[:n], w.Cases[n+1:]...)
-				} else { // process call
-					w.Objects[n-1].processCall(recv.Interface().(*Call))
-				}
-			}
-		}
-	}()
-	return w
-}
-
-func (d *OneGoroutineForNObjects) Drive(obj *Object) {
+func (d *OneGoroutineForNObjects) New() (obj *Object) {
 	d.Call(func() {
 		// select a worker
 		var worker *Worker
 		for _, w := range d.Workers {
-			if len(w.Objects) < d.N {
-				worker = w
+			w.Call(func() {
+				if w.nObjects < d.N {
+					worker = w
+					w.nObjects++
+				}
+			}).Wait()
+			if worker != nil {
 				break
 			}
 		}
@@ -90,8 +60,38 @@ func (d *OneGoroutineForNObjects) Drive(obj *Object) {
 		if worker == nil {
 			worker = NewWorker()
 			d.Workers = append(d.Workers, worker)
+			worker.Call(func() {
+				worker.nObjects++
+			})
 		}
-		// add to worker
-		worker.NewObject <- obj
-	})
+		// create object
+		obj = &Object{
+			calls:   worker.calls,
+			signals: make(map[string][]interface{}),
+		}
+	}).Wait()
+	return obj
+}
+
+type Worker struct {
+	*Object
+	nObjects int
+	calls    chan *Call
+}
+
+func NewWorker() *Worker {
+	w := &Worker{
+		Object: New(),
+		calls:  make(chan *Call),
+	}
+	go func() {
+		for call := range w.calls {
+			if call.object.processCall(call) { // object is dead
+				w.Call(func() {
+					w.nObjects--
+				})
+			}
+		}
+	}()
+	return w
 }

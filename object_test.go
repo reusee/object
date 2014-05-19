@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 // object creation
@@ -20,7 +21,7 @@ func testNewDefaultObject() *Object {
 var testOG4NDriver = NewOneGoroutineForNObjects(32)
 
 func testNewOG4NObject() *Object {
-	return NewWithDriver(testOG4NDriver)
+	return testOG4NDriver.New()
 }
 
 // tests
@@ -334,4 +335,26 @@ func benchArgumentedEmit(b *testing.B, o *Object) {
 	for i := 0; i < b.N; i++ {
 		obj.Emit("signal", true).Wait()
 	}
+}
+
+func BenchmarkDefaultLongtimeCall(b *testing.B) {
+	benchLongtimeCall(b, testNewDefaultObject)
+}
+
+func BenchmarkOG4NLongtimeCall(b *testing.B) {
+	benchLongtimeCall(b, testNewOG4NObject)
+}
+
+func benchLongtimeCall(b *testing.B, ctor func() *Object) {
+	wg := new(sync.WaitGroup)
+	wg.Add(b.N)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := ctor()
+		obj.Call(func() {
+			time.Sleep(time.Microsecond * 200)
+			wg.Done()
+		})
+	}
+	wg.Wait()
 }
