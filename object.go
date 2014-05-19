@@ -3,7 +3,7 @@ package object
 import "sync"
 
 type Object struct {
-	calls   chan *Call
+	call    func(*Call)
 	signals map[string][]interface{}
 }
 
@@ -87,7 +87,7 @@ func (obj *Object) Call(fun interface{}) *Call {
 		fun:      fun,
 		doneCond: condPool.Get().(*sync.Cond),
 	}
-	obj.calls <- call
+	obj.call(call)
 	return call
 }
 
@@ -97,7 +97,7 @@ func (obj *Object) Die() *Call {
 		what:     _Die,
 		doneCond: condPool.Get().(*sync.Cond),
 	}
-	obj.calls <- call
+	obj.call(call)
 	return call
 }
 
@@ -109,7 +109,7 @@ func (obj *Object) Connect(signal string, fun interface{}) *Call {
 		fun:      fun,
 		doneCond: condPool.Get().(*sync.Cond),
 	}
-	obj.calls <- call
+	obj.call(call)
 	return call
 }
 
@@ -121,7 +121,7 @@ func (obj *Object) Emit(signal string, arg ...interface{}) *Call {
 		doneCond: condPool.Get().(*sync.Cond),
 		arg:      arg,
 	}
-	obj.calls <- call
+	obj.call(call)
 	return call
 }
 

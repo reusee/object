@@ -12,12 +12,15 @@ type PerObjectPerGoroutine struct {
 }
 
 func (d *PerObjectPerGoroutine) New() *Object {
+	calls := make(chan *Call, 128)
 	obj := &Object{
-		calls:   make(chan *Call, 128),
+		call: func(call *Call) {
+			calls <- call
+		},
 		signals: make(map[string][]interface{}),
 	}
 	go func() {
-		for call := range obj.calls {
+		for call := range calls {
 			if obj.processCall(call) { // object is dead
 				return
 			}
@@ -66,7 +69,9 @@ func (d *OneGoroutineForNObjects) New() (obj *Object) {
 		}
 		// create object
 		obj = &Object{
-			calls:   worker.calls,
+			call: func(call *Call) {
+				worker.calls <- call
+			},
 			signals: make(map[string][]interface{}),
 		}
 	}).Wait()
