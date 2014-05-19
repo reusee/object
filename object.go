@@ -32,59 +32,66 @@ type Call struct {
 	ret      interface{}
 }
 
-func New() *Object {
+func NewWithDriver(driver Driver) *Object {
 	obj := &Object{
 		calls:   make(chan *Call, 128),
 		signals: make(map[string][]interface{}),
 	}
-	go func() {
-		for call := range obj.calls {
-			switch call.what {
-			case _Call:
-				switch f := call.fun.(type) {
-				case func() interface{}:
-					call.ret = f()
-				case func():
-					f()
-				default:
-					panic("wrong closure type")
+	driver.Drive(obj)
+	return obj
+}
+
+var defaultDriver = new(PerObjectPerGoroutine)
+
+func New() *Object {
+	return NewWithDriver(defaultDriver)
+}
+
+func (obj *Object) processCall(call *Call) (exit bool) {
+	switch call.what {
+	case _Call:
+		switch f := call.fun.(type) {
+		case func() interface{}:
+			call.ret = f()
+		case func():
+			f()
+		default:
+			panic("wrong closure type")
+		}
+	case _Connect:
+		obj.signals[call.signal] = append(obj.signals[call.signal], call.fun)
+	case _Emit:
+		if len(call.arg) > 0 {
+			for i, fun := range obj.signals[call.signal] {
+				if fun == nil {
+					continue
 				}
-			case _Connect:
-				obj.signals[call.signal] = append(obj.signals[call.signal], call.fun)
-			case _Emit:
-				if len(call.arg) > 0 {
-					for i, fun := range obj.signals[call.signal] {
-						if fun == nil {
-							continue
-						}
-						ret := fun.(func(interface{}) bool)(call.arg[0])
-						if !ret {
-							obj.signals[call.signal][i] = nil
-						}
-					}
-				} else {
-					for i, fun := range obj.signals[call.signal] {
-						if fun == nil {
-							continue
-						}
-						ret := fun.(func() bool)()
-						if !ret {
-							obj.signals[call.signal][i] = nil
-						}
-					}
+				ret := fun.(func(interface{}) bool)(call.arg[0])
+				if !ret {
+					obj.signals[call.signal][i] = nil
 				}
 			}
-			call.doneCond.L.Lock()
-			call.done = true
-			call.doneCond.L.Unlock()
-			call.doneCond.Broadcast()
-			condPool.Put(call.doneCond)
-			if call.what == _Die {
-				break
+		} else {
+			for i, fun := range obj.signals[call.signal] {
+				if fun == nil {
+					continue
+				}
+				ret := fun.(func() bool)()
+				if !ret {
+					obj.signals[call.signal][i] = nil
+				}
 			}
 		}
-	}()
-	return obj
+	}
+	call.doneCond.L.Lock()
+	call.done = true
+	call.doneCond.L.Unlock()
+	call.doneCond.Broadcast()
+	condPool.Put(call.doneCond)
+	if call.what == _Die {
+		return true
+	}
+	return false
 }
 
 func (obj *Object) Call(fun interface{}) *Call {
