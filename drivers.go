@@ -34,67 +34,61 @@ func (d *One2OneDriver) New() *Object {
 type N2OneDriver struct {
 	*Object // thread-safe is needed
 	N       int
-	workers []*_Worker
+	workers chan *_Worker
 }
 
 func NewN2OneDriver(n int) *N2OneDriver {
 	return &N2OneDriver{
-		Object: New(),
-		N:      n,
+		Object:  New(),
+		N:       n,
+		workers: make(chan *_Worker),
 	}
 }
 
 func (d *N2OneDriver) New() (obj *Object) {
+	var worker *_Worker
 	d.Call(func() {
-		// select a worker
-		var worker *_Worker
-		for _, w := range d.workers {
-			w.Call(func() {
-				if w.nObjects < d.N {
-					worker = w
-					w.nObjects++
-				}
-			}).Wait()
-			if worker != nil {
-				break
-			}
-		}
-		// none selected, create one
-		if worker == nil {
-			worker = newWorker()
-			d.workers = append(d.workers, worker)
-			worker.Call(func() {
-				worker.nObjects++
-			})
-		}
-		// create object
-		obj = &Object{
-			call: func(call *Call) {
-				worker.calls <- call
-			},
-			signals: make(map[string][]interface{}),
+		select {
+		case worker = <-d.workers:
+		default:
+			d.newWorker()
+			worker = <-d.workers
 		}
 	}).Wait()
+	obj = &Object{
+		call: func(call *Call) {
+			worker.calls <- call
+		},
+		signals: make(map[string][]interface{}),
+	}
 	return obj
 }
 
 type _Worker struct {
-	*Object
-	nObjects int
-	calls    chan *Call
+	calls chan *Call
 }
 
-func newWorker() *_Worker {
+func (d *N2OneDriver) newWorker() *_Worker {
 	w := &_Worker{
-		Object: New(),
-		calls:  make(chan *Call),
+		calls: make(chan *Call),
 	}
+	nObjects := 0
 	go func() {
-		for call := range w.calls {
-			if call.object.processCall(call) { // object is dead
-				w.Call(func() {
-					w.nObjects--
-				})
+		for {
+			if nObjects < d.N { // available
+				select {
+				case d.workers <- w:
+					nObjects++
+				case call := <-w.calls:
+					if call.object.processCall(call) { // object is dead
+						nObjects--
+					}
+				}
+			} else { // not available
+				call := <-w.calls
+				if call.object.processCall(call) { // object is dead
+					nObjects--
+				}
 			}
 		}
 	}()
