@@ -17,7 +17,6 @@ func (d *One2OneDriver) New() *Object {
 		call: func(call *Call) {
 			calls <- call
 		},
-		signals: make(map[string][]interface{}),
 	}
 	go func() {
 		for call := range calls {
@@ -58,7 +57,6 @@ func (d *N2OneDriver) New() (obj *Object) {
 		call: func(call *Call) {
 			worker.calls <- call
 		},
-		signals: make(map[string][]interface{}),
 	}
 	return obj
 }
@@ -151,7 +149,6 @@ func (d *N2MDriver) New() *Object {
 			}
 			runnable.lock.Unlock()
 		},
-		signals: make(map[string][]interface{}),
 	}
 	runnable.object = obj
 	return obj
