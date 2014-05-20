@@ -32,14 +32,13 @@ func (d *One2OneDriver) New() *Object {
 // one goroutine for n objects
 
 type N2OneDriver struct {
-	*Object // thread-safe is needed
 	N       int
 	workers chan *_Worker
+	lock    sync.Mutex
 }
 
 func NewN2OneDriver(n int) *N2OneDriver {
 	return &N2OneDriver{
-		Object:  New(),
 		N:       n,
 		workers: make(chan *_Worker),
 	}
@@ -47,14 +46,14 @@ func NewN2OneDriver(n int) *N2OneDriver {
 
 func (d *N2OneDriver) New() (obj *Object) {
 	var worker *_Worker
-	d.Call(func() {
-		select {
-		case worker = <-d.workers:
-		default:
-			d.newWorker()
-			worker = <-d.workers
-		}
-	}).Wait()
+	d.lock.Lock()
+	select {
+	case worker = <-d.workers:
+	default:
+		d.newWorker()
+		worker = <-d.workers
+	}
+	d.lock.Unlock()
 	obj = &Object{
 		call: func(call *Call) {
 			worker.calls <- call
