@@ -3,45 +3,70 @@ package object
 import "sync"
 
 type Object struct {
-	call func(func())
+	call func(_Callable)
 }
 
 var New = new(One2OneDriver).New
 
+type _Call func()
+
+func (c _Call) Call() {
+	c()
+}
+
 func (obj *Object) Call(fun func()) {
-	obj.call(fun)
+	obj.call(_Call(fun))
+}
+
+type _SyncedCall struct {
+	lock sync.Mutex
+	fun  func()
+}
+
+func (c *_SyncedCall) Call() {
+	c.fun()
+	c.lock.Unlock()
 }
 
 func (obj *Object) SyncedCall(fun func()) {
-	var lock sync.Mutex
-	lock.Lock()
-	obj.call(func() {
-		fun()
-		lock.Unlock()
-	})
-	lock.Lock()
+	call := new(_SyncedCall)
+	call.lock.Lock()
+	call.fun = fun
+	obj.call(call)
+	call.lock.Lock()
+}
+
+type _FutureCall struct {
+	cond *sync.Cond
+	done bool
+	ret  interface{}
+	fun  func() interface{}
+}
+
+func (c *_FutureCall) Call() {
+	c.ret = c.fun()
+	c.cond.L.Lock()
+	c.done = true
+	c.cond.L.Unlock()
+	c.cond.Broadcast()
+}
+
+func (c *_FutureCall) Get() interface{} {
+	c.cond.L.Lock()
+	if !c.done {
+		c.cond.Wait()
+	}
+	c.cond.L.Unlock()
+	return c.ret
 }
 
 func (obj *Object) FutureCall(fun func() interface{}) (future func() interface{}) {
-	cond := sync.NewCond(new(sync.Mutex))
-	var done bool
-	var ret interface{}
-	obj.call(func() {
-		ret = fun()
-		cond.L.Lock()
-		done = true
-		cond.L.Unlock()
-		cond.Broadcast()
-	})
-	future = func() interface{} {
-		cond.L.Lock()
-		if !done {
-			cond.Wait()
-		}
-		cond.L.Unlock()
-		return ret
+	call := &_FutureCall{
+		cond: sync.NewCond(new(sync.Mutex)),
+		fun:  fun,
 	}
-	return
+	obj.call(call)
+	return call.Get
 }
 
 func (obj *Object) Die() {
