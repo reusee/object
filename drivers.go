@@ -12,17 +12,18 @@ type One2OneDriver struct {
 }
 
 func (d *One2OneDriver) New() *Object {
-	calls := make(chan *Call, 128)
+	calls := make(chan func(), 128)
 	obj := &Object{
-		call: func(call *Call) {
+		call: func(call func()) {
 			calls <- call
 		},
 	}
 	go func() {
 		for call := range calls {
-			if obj.processCall(call) { // object is dead
+			if call == nil {
 				return
 			}
+			call()
 		}
 	}()
 	return obj
@@ -54,7 +55,7 @@ func (d *N2OneDriver) New() (obj *Object) {
 	}
 	d.lock.Unlock()
 	obj = &Object{
-		call: func(call *Call) {
+		call: func(call func()) {
 			worker.calls <- call
 		},
 	}
@@ -62,12 +63,12 @@ func (d *N2OneDriver) New() (obj *Object) {
 }
 
 type _Worker struct {
-	calls chan *Call
+	calls chan func()
 }
 
 func (d *N2OneDriver) newWorker() *_Worker {
 	w := &_Worker{
-		calls: make(chan *Call),
+		calls: make(chan func(), d.N*128),
 	}
 	nObjects := 0
 	go func() {
@@ -77,14 +78,18 @@ func (d *N2OneDriver) newWorker() *_Worker {
 				case d.workers <- w:
 					nObjects++
 				case call := <-w.calls:
-					if call.object.processCall(call) { // object is dead
+					if call == nil {
 						nObjects--
+					} else {
+						call()
 					}
 				}
 			} else { // not available
 				call := <-w.calls
-				if call.object.processCall(call) { // object is dead
+				if call == nil {
 					nObjects--
+				} else {
+					call()
 				}
 			}
 		}
@@ -112,7 +117,9 @@ func NewN2MDriver(n int) *N2MDriver {
 						runnable.lock.Unlock()
 						break
 					}
-					runnable.object.processCall(runnable.calls[0])
+					if f := runnable.calls[0]; f != nil {
+						f()
+					}
 					runnable.calls = runnable.calls[1:]
 					runnable.lock.Unlock()
 				}
@@ -123,10 +130,9 @@ func NewN2MDriver(n int) *N2MDriver {
 }
 
 type _Runnable struct {
-	state  int
-	lock   *sync.Mutex
-	calls  []*Call
-	object *Object
+	state int
+	lock  *sync.Mutex
+	calls []func()
 }
 
 const (
@@ -140,7 +146,7 @@ func (d *N2MDriver) New() *Object {
 		lock:  new(sync.Mutex),
 	}
 	obj := &Object{
-		call: func(call *Call) {
+		call: func(call func()) {
 			runnable.lock.Lock()
 			runnable.calls = append(runnable.calls, call)
 			if runnable.state == _StateSleep {
@@ -150,6 +156,5 @@ func (d *N2MDriver) New() *Object {
 			runnable.lock.Unlock()
 		},
 	}
-	runnable.object = obj
 	return obj
 }

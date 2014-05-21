@@ -3,187 +3,147 @@ package object
 import (
 	"sync"
 	"testing"
-	"time"
 )
 
-// object creation
+func TestAll(t *testing.T) {
+	drivers := []Driver{
+		new(One2OneDriver),
+		NewN2OneDriver(32),
+		NewN2MDriver(128),
+	}
+	tests := []func(*testing.T, Driver){
+		testCall,
+		testSyncedCall,
+		testFutureCall,
+	}
+	for _, test := range tests {
+		for _, driver := range drivers {
+			test(t, driver)
+		}
+	}
+}
+
+// tests
 
 type testObject struct {
 	*Object
 	i int
 }
 
-var testN2One = NewN2OneDriver(32)
-
-var testN2M = NewN2MDriver(32)
-
-// tests
-
-func TestDefaultCall(t *testing.T) {
-	testCall(t, New())
-}
-
-func TestN2OneCall(t *testing.T) {
-	testCall(t, testN2One.New())
-}
-
-func TestN2MCall(t *testing.T) {
-	testCall(t, testN2M.New())
-}
-
-func testCall(t *testing.T, o *Object) {
+func testCall(t *testing.T, d Driver) {
 	obj := &testObject{
-		Object: o,
+		Object: d.New(),
 	}
-	defer func() {
-		obj.Die().Wait()
-	}()
-	n := 10000
+	defer obj.Die()
+	n := 102400
+	for i := 0; i < n; i++ {
+		obj.Call(func() {
+			obj.i++
+		})
+	}
+	wait := make(chan bool)
+	obj.Call(func() {
+		close(wait)
+	})
+	<-wait
+	if obj.i != n {
+		t.Fatal("Call")
+	}
+}
+
+func testSyncedCall(t *testing.T, d Driver) {
+	obj := &testObject{
+		Object: d.New(),
+	}
+	defer obj.Die()
+	n := 102400
+	for i := 0; i < n; i++ {
+		obj.SyncedCall(func() {
+			obj.i++
+		})
+	}
+	if obj.i != n {
+		t.Fatal("SyncedCall")
+	}
+}
+
+func testFutureCall(t *testing.T, d Driver) {
+	obj := d.New()
+	val := obj.FutureCall(func() interface{} {
+		return "foobar"
+	})
+	n := 1024
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
 	for i := 0; i < n; i++ {
 		go func() {
-			obj.Call(func() {
-				obj.i++
-			}).Wait()
+			if val().(string) != "foobar" {
+				t.Fatal("FutureCall")
+			}
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	if obj.i != n {
-		t.Fail()
-	}
-}
-
-func TestDefaultCallGet(t *testing.T) {
-	testCallGet(t, New())
-}
-
-func TestN2OneCallGet(t *testing.T) {
-	testCallGet(t, testN2One.New())
-}
-
-func TestN2MCallGet(t *testing.T) {
-	testCallGet(t, testN2M.New())
-}
-
-func testCallGet(t *testing.T, o *Object) {
-	obj := &testObject{
-		Object: o,
-	}
-	defer func() {
-		obj.Die().Wait()
-	}()
-	call := obj.Call(func() interface{} {
-		return obj.i
-	})
-	if call.Get().(int) != obj.i {
-		t.Fail()
-	}
-}
-
-func TestDefaultReturnValue(t *testing.T) {
-	testReturnValue(t, New())
-}
-
-func TestN2OneReturnValue(t *testing.T) {
-	testReturnValue(t, testN2One.New())
-}
-
-func TestN2MReturnValue(t *testing.T) {
-	testReturnValue(t, testN2M.New())
-}
-
-func testReturnValue(t *testing.T, o *Object) {
-	obj := &testObject{
-		Object: o,
-	}
-	defer func() {
-		obj.Die().Wait()
-	}()
-	var ret int
-	obj.Call(func() {
-		ret = obj.i
-	}).Wait()
-	if ret != obj.i {
-		t.Fail()
-	}
 }
 
 // benchmarks
 
-func BenchmarkDefaultCall(b *testing.B) {
+var benchNto1Driver = NewN2OneDriver(32)
+var benchNtoMDriver = NewN2MDriver(128)
+
+func Benchmark1to1Call(b *testing.B) {
 	benchCall(b, New())
 }
 
-func BenchmarkN2OneCall(b *testing.B) {
-	benchCall(b, testN2One.New())
+func BenchmarkNto1Call(b *testing.B) {
+	benchCall(b, benchNto1Driver.New())
 }
 
-func BenchmarkN2MCall(b *testing.B) {
-	benchCall(b, testN2M.New())
+func BenchmarkNtoMCall(b *testing.B) {
+	benchCall(b, benchNtoMDriver.New())
 }
 
-func benchCall(b *testing.B, o *Object) {
-	obj := &testObject{
-		Object: o,
-	}
-	defer func() {
-		obj.Die().Wait()
-	}()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		obj.Call(func() {}).Wait()
-	}
-}
-
-func BenchmarkDefaultCallNoWait(b *testing.B) {
-	benchCallNoWait(b, New())
-}
-
-func BenchmarkN2OneCallNoWait(b *testing.B) {
-	benchCallNoWait(b, testN2One.New())
-}
-
-func BenchmarkN2MCallNoWait(b *testing.B) {
-	benchCallNoWait(b, testN2M.New())
-}
-
-func benchCallNoWait(b *testing.B, o *Object) {
-	obj := &testObject{
-		Object: o,
-	}
-	defer func() {
-		obj.Die().Wait()
-	}()
-	b.ResetTimer()
+func benchCall(b *testing.B, obj *Object) {
 	for i := 0; i < b.N; i++ {
 		obj.Call(func() {})
 	}
 }
 
-func BenchmarkDefaultLongtimeCall(b *testing.B) {
-	benchLongtimeCall(b, New)
+func Benchmark1to1SyncedCall(b *testing.B) {
+	benchSyncedCall(b, New())
 }
 
-func BenchmarkN2OneLongtimeCall(b *testing.B) {
-	benchLongtimeCall(b, testN2One.New)
+func BenchmarkNto1SyncedCall(b *testing.B) {
+	benchSyncedCall(b, benchNto1Driver.New())
 }
 
-func BenchmarkN2MLongtimeCall(b *testing.B) {
-	benchLongtimeCall(b, testN2M.New)
+func BenchmarkNtoMSyncedCall(b *testing.B) {
+	benchSyncedCall(b, benchNtoMDriver.New())
 }
 
-func benchLongtimeCall(b *testing.B, ctor func() *Object) {
-	wg := new(sync.WaitGroup)
-	wg.Add(b.N)
-	b.ResetTimer()
+func benchSyncedCall(b *testing.B, obj *Object) {
 	for i := 0; i < b.N; i++ {
-		obj := ctor()
-		obj.Call(func() {
-			time.Sleep(time.Microsecond * 200)
-			wg.Done()
-		})
+		obj.SyncedCall(func() {})
 	}
-	wg.Wait()
+}
+
+func Benchmark1to1FutureCall(b *testing.B) {
+	benchFutureCall(b, New())
+}
+
+func BenchmarkNto1FutureCall(b *testing.B) {
+	benchFutureCall(b, benchNto1Driver.New())
+}
+
+func BenchmarkNtoMFutureCall(b *testing.B) {
+	benchFutureCall(b, benchNtoMDriver.New())
+}
+
+func benchFutureCall(b *testing.B, obj *Object) {
+	for i := 0; i < b.N; i++ {
+		val := obj.FutureCall(func() interface{} {
+			return true
+		})
+		_ = val().(bool)
+	}
 }
